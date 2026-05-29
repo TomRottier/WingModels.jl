@@ -9,7 +9,7 @@ To install this package run:
 ## Background
 A wing geometry can be defined in two parts: 
 - an aerofoil distribution: defines the aerofoil shape at each spanwise location. 
-- a planform: defines the leading and trailing edges, which can equivalently be specified by a spanwise chord distribution and a quarter chord line. The latter is used here. 
+- a planform: defines a spanwise chord distribution and a quarter chord line.
     
 The whole wing is then given by scaling the aerofoil at each spanwise location by the chord length and translating it onto the quarter chord line. By conforming to this specification arbitrary wing geometries can be created by specifying the aerofoil distribution and the planform.
 
@@ -32,14 +32,14 @@ First, create the aerofoil distribution, for this example we are using the NACA0
 ```
 the points defining this aerofoil at a specific spanwise location can be returned with the following function:
 ```julia
-    aerofoil(0.0, af; nchord=100) # returns 100 points describing this aerofoil at the wing root (0.0)
-    aerofoil(1.0, af; nchord=100) # returns 100 points describing this aerofoil at the wing tip (1.0)
-    aerofoil(0.5, af; nchord=100) # returns 100 points describing this aerofoil at mid-span (0.5)
+    aerofoil(0.0, af; n=50) # returns 100 points describing this aerofoil at the wing root (0.0)
+    aerofoil(1.0, af; n=50) # returns 100 points describing this aerofoil at the wing tip (1.0)
+    aerofoil(0.5, af; n=50) # returns 100 points describing this aerofoil at mid-span (0.5)
 ```
 as this aerofoil distribution is constant along the span, these three function calls return the same points. To return a specific chordwise coordinate use the following function instead:
 ```julia
-    aerofoil_pt(0.0, 0.0, af; upper=true) # returns the point located at the leading edge on the upper surface
-    aerofoil_pt(0.5, 0.0, af; upper=false) # returns the point located at mid-chord on the lower surface
+    aerofoil_height(0.0, 0.0, af; upper=true) # returns the height at the leading edge on the upper surface
+    aerofoil_height(0.5, 0.0, af; upper=false) # returns the height at mid-chord on the lower surface
 ```
 
 Next we create the wing planform, which is just a simple, rectangular wing with aspect ratio of 4:
@@ -114,8 +114,8 @@ To create your own planform type you must create a new subtype of `AbstractPlanf
     end
 
     # add methods for your planform, see docstrings for requirements
-    Wings.quarter_chord(ξ, pl::YourPlanform) = ...
-    Wings.chord(ξ, pl::YourPlanform) = ...
+    Wings.quarter_chord(y, pl::YourPlanform) = ...
+    Wings.chord(y, pl::YourPlanform) = ...
 ```
 
 Create your own aerofoil distribution in a similar way
@@ -126,8 +126,7 @@ Create your own aerofoil distribution in a similar way
     end
 
     # add methods for you aerofoils, see docstrings for requirements
-    Wings.aerofoil(ξ, af::YourAerofoil; nchord) = ...
-    Wings.aerofoil_pt(η, ξ, af::YourAerofoil; upper) = ... # optional
+    Wings.aerofoil_height(x, y, af::YourAerofoil; upper) = ...
 ```
 
 The full wing can then be used just as before:

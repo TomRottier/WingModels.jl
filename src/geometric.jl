@@ -16,7 +16,7 @@ Chord distribution defined by 2 parameters:
 - `c₀`: root chord length normalised by wing length
 - `x`: spanwise location where chord distribution begins to decrease linearly
 
-The slope of the linear decrease is determined by the value of `x` such that the chord length is zero when ξ = 1.
+The slope of the linear decrease is determined by the value of `x` such that the chord length is zero when y = 1.
 """
 struct TrapezoidalPlanform <: AbstractPlanform
     r::Float64
@@ -25,8 +25,8 @@ struct TrapezoidalPlanform <: AbstractPlanform
     x::Float64
 end
 
-quarter_chord(ξ, p::TrapezoidalPlanform) = ξ < p.r ? 0.0 : (ξ - p.r) * tan(p.ϕ)
-chord(ξ, p::TrapezoidalPlanform) = ξ ≤ p.x ? p.c₀ : p.c₀ - p.c₀ * (ξ - p.x) / (1 - p.x)
+quarter_chord(y, p::TrapezoidalPlanform) = y < p.r ? 0.0 : (y - p.r) * tan(p.ϕ)
+chord(y, p::TrapezoidalPlanform) = y ≤ p.x ? p.c₀ : p.c₀ - p.c₀ * (y - p.x) / (1 - p.x)
 
 
 """
@@ -51,10 +51,10 @@ struct EllipticalPlanform <: AbstractPlanform
     c₂::Float64
 end
 
-__elliptical_leading_edge(ξ, a, b) = sqrt((1 - ξ^2 / a^2) * b^2)
-__elliptical_trailing_edge(ξ, c, d) = -sqrt((1 - ξ^2 / c^2) * d^2)
-chord(ξ, pl::EllipticalPlanform) = __elliptical_leading_edge(ξ, 1.0, pl.c₁) - __elliptical_trailing_edge(ξ, 1.0, pl.c₂)
-quarter_chord(ξ, pl::EllipticalPlanform) = -__elliptical_leading_edge(ξ, 1.0, pl.c₁) + 0.25 * chord(ξ, pl)
+__elliptical_leading_edge(y, a, b) = sqrt((1 - y^2 / a^2) * b^2)
+__elliptical_trailing_edge(y, c, d) = -sqrt((1 - y^2 / c^2) * d^2)
+chord(y, pl::EllipticalPlanform) = __elliptical_leading_edge(y, 1.0, pl.c₁) - __elliptical_trailing_edge(y, 1.0, pl.c₂)
+quarter_chord(y, pl::EllipticalPlanform) = -__elliptical_leading_edge(y, 1.0, pl.c₁) + 0.25 * chord(y, pl)
 
 
 """
@@ -69,8 +69,8 @@ A rectangular planform with constant chord length along the span and a quarter c
 struct RectangularPlanform <: AbstractPlanform
     c::Float64
 end
-chord(ξ, p::RectangularPlanform) = p.c
-quarter_chord(ξ, p::RectangularPlanform) = 0.0
+chord(y, p::RectangularPlanform) = p.c
+quarter_chord(y, p::RectangularPlanform) = 0.0
 
 """
     TriangularPlanform <: AbstractPlanform
@@ -87,9 +87,9 @@ struct TriangularPlanform <: AbstractPlanform
     c₀::Float64
     Λ::Float64
 end
-__triangular_leading_edge(ξ, pl) = 0.25pl.c₀ - ξ * tan(pl.Λ)
-chord(ξ, pl::TriangularPlanform) = pl.c₀ * (1 - ξ)
-quarter_chord(ξ, pl::TriangularPlanform) = __triangular_leading_edge(ξ, pl) - 0.25chord(ξ, pl)
+__triangular_leading_edge(y, pl) = 0.25pl.c₀ - y * tan(pl.Λ)
+chord(y, pl::TriangularPlanform) = pl.c₀ * (1 - y)
+quarter_chord(y, pl::TriangularPlanform) = __triangular_leading_edge(y, pl) - 0.25chord(y, pl)
 
 
 """
@@ -97,10 +97,17 @@ quarter_chord(ξ, pl::TriangularPlanform) = __triangular_leading_edge(ξ, pl) - 
 
 A rectangular aerofoil e.g. for a flat plate.
     RectangularAerofoil(t)
-- `t`: thickness of the aerofoil (constant along its chord)
+
+- `t`: thickness of the aerofoil relative to chord length
 """
 struct RectangularAerofoil <: AbstractAerofoil
     t::Float64
 end
-aerofoil(ξ, p::RectangularAerofoil; nchord=100) = [fill(p.t, nchord ÷ 2); fill(-p.t, nchord ÷ 2)]
-aerofoil_pt(η, ξ, p::RectangularAerofoil; upper) = upper ? p.t : -p.t
+aerofoil_height(x, y, p::RectangularAerofoil; upper) = upper ? p.t : -p.t
+# aerofoil(y, p::RectangularAerofoil; n=50) = begin
+#     xs = vcat(range(0, 1, n), range(1, 0, n))
+#     us = vcat(fill(true, n), fill(false, n))
+#     map(xs, us) do x, upper
+#         [x, aerofoil_height(x, y, p; upper)]
+#     end
+# end

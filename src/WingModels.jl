@@ -4,7 +4,11 @@ using LinearAlgebra: normalize, ×
 using QuadGK: quadgk
 
 export AbstractPlanform, AbstractAerofoil, Wing
-export quarter_chord, chord, aerofoil, aerofoil_pt, leading_edge, trailing_edge, wing_planform, wing
+export quarter_chord, chord, aerofoil_height
+export aerofoil, leading_edge, trailing_edge, planform, wing
+
+const UNDEFINED_INTERFACE_MSG = "reaching here means you haven't defined the appropiate functions for the interface"
+
 
 """
     AbstractPlanform
@@ -17,13 +21,18 @@ To use your own planform with the functions in this package you must define your
         data # data needed to define your planform
     end
 
-    quarter_chord(ξ, pl::YourPlanform<:AbstractPlanform) = ...    
-which gives the x (chordwise) coordinate of quarter chord for given spanwise location `ξ`.
+    quarter_chord(y, pl::YourPlanform<:AbstractPlanform) = ...    
+which gives the x (chordwise) coordinate of quarter chord for given spanwise location `y`.
 
-    chord(ξ, pl::YourPlanform<:AbstractPlanform) = ... 
-which gives the chord length for the given spanwise location `ξ`.
+    chord(y, pl::YourPlanform<:AbstractPlanform) = ... 
+which gives the chord length for the given spanwise location `y`.
 """
 abstract type AbstractPlanform end
+
+chord(y, p::AbstractPlanform) = error(UNDEFINED_INTERFACE_MSG)
+quarter_chord(y, p::AbstractPlanform) = error(UNDEFINED_INTERFACE_MSG)
+
+
 
 """
     AbstractAerofoil
@@ -36,77 +45,53 @@ To use your own aerofoil distribution with the functions in this package you mus
         data # data needed to define your aerofoil distrbutions
     end
 
-    aerofoil(ξ, af::YourAerofoil<:AbstractAerofoil; nchord) = ...
-
-which returns a Vector{Vector{<:Real}} describing a series of points outlining the aerofoil at the given spanwise location `ξ`. The points must go from leading edge to trailing edge along upper surface then back to leading edge along lower surface. The number of points is defined by the keyword argument `nchord`.
-
-You may optionally define the following method:
-
-    aerofoil_pt(η, ξ, af::YourAerofoil<:AbstractAerofoil; upper=true) = ...
-
-which returns a 2D vector for a point (x and z coordinate) on the aerofoil at chordwise location `η` and spanwise location `ξ`. 'upper' determines is this point is on the upper or lower surface of the aerofoil.
+    aerofoil_height(x, y, af::YourAerofoil<:AbstractAerofoil; upper=true) = ...
+which returns the height of the aerofoil at chordwise location `x` and spanwise location `y`. 'upper' determines if this point is on the upper or lower surface of the aerofoil.
 """
 abstract type AbstractAerofoil end
 
-# generic functions
-"""
-    leading_edge(ξ, pl::AbstractPlanform)
+aerofoil_height(x, y, p::AbstractAerofoil; upper) = error(UNDEFINED_INTERFACE_MSG)
 
-Calculate the x (chordwise) coordinate for a given planform `pl` at the given spanwise location `ξ`.
-"""
-leading_edge(ξ, pl::AbstractPlanform) = quarter_chord(ξ, pl) - 0.25chord(ξ, pl)
+
+
 
 """
-    trailing_edge(ξ, pl::AbstractPlanform)
+    aerofoil(y, p::AbstractAerofoil; n=100)
 
-Calculate the x (chordwise) coordinate for a given planform `pl` at the given spanwise location `ξ`.
+Returns `Vector` of the 2D [x,z] points describing the aerofoil at spanwise location `y`. The ordering of the points goes from the leading edge to trailing edge along the upper surface, the from the trailing edge to the leading edge along the lower surface. The keyword argument `n` gives the number of points along each upper and lower surface such that the total number of points returned is `2n`
 """
-trailing_edge(ξ, pl::AbstractPlanform) = quarter_chord(ξ, pl) + 0.75chord(ξ, pl)
-
-"""
-    wing_planform(pl::AbstractPlanform; n=100)
-
-Generate a vector of points giving the x (chordwise) coordinate of each of `n` points on a given planform `pl`. Points start from wing root leading edge and proceed to wing tip leading edge, wing tip trailing edge and back to wing root trailing edge.
-"""
-wing_planform(pl::AbstractPlanform; n=100) = [
-    map(ξ -> leading_edge(ξ, pl), range(0, 1, length=n ÷ 2));
-    map(ξ -> trailing_edge(ξ, pl), range(1, 0, length=n ÷ 2))
+aerofoil(y, p::AbstractAerofoil; n=50) = [
+    map(x -> [x, aerofoil_height(x, y, p; upper=true)], range(0, 1, length=n));
+    map(x -> [x, aerofoil_height(x, y, p; upper=false)], range(1, 0; length=n))
 ]
 
 """
-    wing(pl::AbstractPlanform, af::AbstractAerofoil; nchord=100, nspan=50)
-Generate a wing from a given planform and aerofoil distribution. 
+    leading_edge(y, pl::AbstractPlanform)
 
-A wing is a vector of 3D points on the surface of the wing. The points start from the leading edge of the root aerofoil and go over the upper surface to the trailing edge then along lower surface back to the leading edge before going to the next aerofoil along the span. There are `nchord` points per aerofoil and `nspan` aerofoils along the span, giving a total of `nchord * nspan` points on the wing. Specify `ξ₀` and `ξ₁` as the start and end spanwise locations, respectively.
-
-To use this function with your own defined planform and aerofoil distribution you must define the relevant functions.
-
-See also: [`AbstractPlanform`](@ref), [`AbstractAerofoil`](@ref) 
+Returns the x (chordwise) coordinate for a given planform `pl` at the given spanwise location `y`.
 """
-function wing(pl::AbstractPlanform, af::AbstractAerofoil, ξ₀=0.0, ξ₁=1.0; nchord=100, nspan=50)
-    # spanwise locations
-    ξs = range(ξ₀, ξ₁, length=nspan)
+leading_edge(y, pl::AbstractPlanform) = quarter_chord(y, pl) - 0.25chord(y, pl)
 
-    # create wing
-    wing = mapreduce(vcat, ξs) do ξ
-        # create normalised aerofoil
-        normalised_aerofoil = aerofoil(ξ, af; nchord=nchord)
+"""
+    trailing_edge(y, pl::AbstractPlanform)
 
-        # fit aerofoils to planform - must scale first, then translate
-        return translate_aerofoil(ξ, scale_aerofoil(ξ, normalised_aerofoil, pl), pl)
-    end
+Calculate the x (chordwise) coordinate for a given planform `pl` at the given spanwise location `y`.
+"""
+trailing_edge(y, pl::AbstractPlanform) = quarter_chord(y, pl) + 0.75chord(y, pl)
 
-    return wing
-end
+"""
+    planform(pl::AbstractPlanform; n=100)
 
-# scale aerofoil by chord length in x and z components, leaidng edge must be at (0.0, 0.0)
-scale_aerofoil(ξ, aerofoil, pl::AbstractPlanform) = map(pt -> pt .* (chord(ξ, pl), 1, chord(ξ, pl)), aerofoil)
-
-# translate aerofoil to quarter chord line - aerofoils all have leading edge at 0, translate to 0.25 (applies translation before scale)
-translate_aerofoil(ξ, aerofoil, pl::AbstractPlanform) = aerofoil .+ Ref([quarter_chord(ξ, pl) - 0.25chord(ξ, pl), 0.0, 0.0])
+Returns a `Vector` of 2D [y,x] planform in the y-x plane (z = 0). The ordering of the points goes from the wing root at the leading edge to wing tip leading edge, wing tip trailing edge, and wing root trailing edge. The keyword argument `n` gives the number of points along each leading and trailing edge such that the total number of points returned is `2n`
+"""
+planform(pl::AbstractPlanform; n=50) = [
+    map(y -> [y, leading_edge(y, pl)], range(0, 1, length=n));
+    map(y -> [y, trailing_edge(y, pl)], range(1, 0, length=n))
+]
 
 
-# wing type
+
+
 """
     Wing
 
@@ -116,22 +101,62 @@ struct Wing{A<:AbstractAerofoil,P<:AbstractPlanform}
     aerofoil::A
     planform::P
 end
-wing(w::Wing, ξ₀=0.0, ξ₁=1.0; nchord=100, nspan=50) = wing(w.planform, w.aerofoil, ξ₀, ξ₁; nchord=nchord, nspan=nspan)
-chord(ξ, w::Wing) = chord(ξ, w.planform)
 
-aerofoil(ξ, w::Wing; nchord) = aerofoil(ξ, w.aerofoil; nchord=nchord)
-aerofoil_pt(η, ξ, w::Wing; upper) = aerofoil_pt(η, ξ, w.aerofoil; upper=upper)
-quarter_chord(ξ, w::Wing) = quarter_chord(ξ, w.planform)
-leading_edge(ξ, w::Wing) = leading_edge(ξ, w.planform)
-trailing_edge(ξ, w::Wing) = trailing_edge(ξ, w.planform)
-wing_planform(w::Wing; n=100) = wing_planform(w.planform; n=n)
+quarter_chord(y, w::Wing) = quarter_chord(y, w.planform)
+chord(y, w::Wing) = chord(y, w.planform)
+aerofoil_height(x, y, w::Wing; upper) = aerofoil_height(x, y, w.aerofoil; upper=upper)
+aerofoil(y, w::Wing; n=50) = aerofoil(y, w.aerofoil; n)
+leading_edge(y, w::Wing) = leading_edge(y, w.planform)
+trailing_edge(y, w::Wing) = trailing_edge(y, w.planform)
+planform(w::Wing; n=50) = planform(w.planform; n)
 
-# fallback to error if interface not defined properly
-const NON_DEFINED_INTERFACE_MSG = "reaching here means you haven't defined the appropiate functions for the interface" # I think 
-chord(ξ, p::AbstractPlanform) = leading_edge(ξ, p) - trailing_edge(ξ, p) #error(NON_DEFINED_INTERFACE_MSG)
-quarter_chord(ξ, p::AbstractPlanform) = leading_edge(ξ, p) + 0.25chord(ξ, p) #error(NON_DEFINED_INTERFACE_MSG)
-aerofoil(ξ, p::AbstractAerofoil; nchord=100) = error(NON_DEFINED_INTERFACE_MSG)
-aerofoil_pt(η, ξ, p::AbstractAerofoil; upper, nchord=100) = error(NON_DEFINED_INTERFACE_MSG)
+
+
+"""
+    wing(pl::AbstractPlanform, af::AbstractAerofoil; nchord=100, nspan=50)
+
+Generates a wing from a given planform and aerofoil distribution.
+
+Returns a `Vector` of 3D [x,y,z] points describing the surface of the wing. The ordering of the points goes from the wing root leading edge to the wing root trailing edge along the upper surface, then from the wing root trailing edge to the wing root leading edge along the lower surface. From here it moves outwards along the spanwise axis to the wing tip following the same ordering pattern. The keyword arguments `nchord` and `nspan` specify the number of points per aerofoil surface and per planform edge, respectively (i.e. there are `2nchord` points per aerofoil and `2nspan` aerofoils along the span giving a total to `4 * nchord * nspan` points per wing).
+
+The other positional arguments `y₀ = 0.0` and `y₁ = 1.0` specify the starting and ending spanwise locations for the wing. This allows portions of the full wing to be easily created.
+
+See also: [`AbstractPlanform`](@ref), [`AbstractAerofoil`](@ref) 
+"""
+function wing(pl::AbstractPlanform, af::AbstractAerofoil, y₀=0.0, y₁=1.0; nchord=100, nspan=50)
+    # spanwise locations
+    ys = range(y₀, y₁; length=nspan)
+
+    # create wing
+    wing = mapreduce(vcat, ys) do y
+        # create normalised aerofoil
+        normalised_aerofoil = aerofoil(y, af; n=nchord)
+
+        # fit aerofoils to planform - must scale first, then translate
+        return translate_aerofoil(y, scale_aerofoil(y, normalised_aerofoil, pl), pl)
+    end
+
+    return wing
+end
+
+wing(w::Wing, y₀=0.0, y₁=1.0; nchord=100, nspan=50) = wing(w.planform, w.aerofoil, y₀, y₁; nchord=nchord, nspan=nspan)
+
+
+"""
+    scale_aerofoil(y, aerofoil, pl::AbstractPlanform) 
+
+Scale the `aerofoil` by the local chord length for the spanwise location `y`
+"""
+scale_aerofoil(y, aerofoil, pl::AbstractPlanform) = map(pt -> pt * chord(y, pl), aerofoil)
+
+"""
+    translate_aerofoil(y, aerofoil, pl::AbstractPlanform)
+
+Translate the `aerofoil` at the spanwise location `y` such that its quarter chord is at quarter_chord(y, pl)` and its spanwise location is at `y`
+"""
+translate_aerofoil(y, aerofoil, pl::AbstractPlanform) = map(pt -> [pt[1] + leading_edge(y, pl), y, pt[2]], aerofoil)
+
+
 
 include("utils.jl")
 include("properties.jl")
