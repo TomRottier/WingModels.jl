@@ -91,8 +91,11 @@ liu_quarter_chord(ξ, r, ϕ) = ξ < r ? 0.0 : (ξ - r) * tan(ϕ)
 # interface functions
 WingModels.quarter_chord(ξ, p::LiuPlanform) = liu_quarter_chord(ξ, p.r, p.ϕ)
 WingModels.chord(ξ, p::LiuPlanform) = liu_chord(ξ, p.E, p.c₀)
-WingModels.aerofoil(ξ, p::LiuAerofoil; nchord=100) = liu_aerofoil(ξ, p.S, p.A, p.zcmax, p.ztmax; n=nchord)
-WingModels.aerofoil_pt(η, ξ, p::LiuAerofoil; upper, kwargs...) = liu_aerofoil_pt(η, ξ, p.S, p.A, p.zcmax, p.ztmax; upper, kwargs...)
+WingModels.aerofoil_height(x, y, p::LiuAerofoil; upper) = liu_aerofoil_pt(x, y, p.S, p.A, p.zcmax, p.ztmax; upper)[3]
+# WingModels.aerofoil(ξ, p::LiuAerofoil; n=50) = [
+#     map(x -> [x, liu_aerofoil_pt(x, y, p.S, p.A, p.zcmax, p.ztmax; upper=true)[3]], range(0, 1; length=n));
+#     map(x -> [x, liu_aerofoil_pt(x, y, p.S, p.A, p.zcmax, p.ztmax; upper=false)[3]], range(1, 0; length=n))
+# ]
 
 
 

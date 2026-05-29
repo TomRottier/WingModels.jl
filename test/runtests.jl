@@ -3,34 +3,56 @@ using WingModels
 
 @testset "all" verbose = true begin
 
-    @testset "generic wings" verbose = true begin
-        # using Test planform: constant quarter chord at 0.0
-        struct TestPlanform <: AbstractPlanform end
-        WingModels.quarter_chord(ξ, p::TestPlanform) = 1.0
-        WingModels.chord(ξ, p::TestPlanform) = 0.5
-
-        ηs = range(0, 1, length=10)
-        ξs = range(0, 1, length=5)
-        pl = TestPlanform()
-        foreach(ξs) do ξ
-            # rectangular aerofoil with height 1
-            __aerofoil = [map(η -> [η, ξ, 1.0], ηs); map(η -> [η, ξ, 1.0], ηs)]
-
-            # test scaling
-            scaled_aerofoil = WingModels.scale_aerofoil(ξ, __aerofoil, pl)
-            @test scaled_aerofoil[1][1] == 0.0
-            @test scaled_aerofoil[end][1] == 0.5
-            @test scaled_aerofoil[1][3] == 0.5
-            @test scaled_aerofoil[end][3] == 0.5
-
-            # test translation (combined with scaling)
-            translated_aerofoil = WingModels.translate_aerofoil(ξ, scaled_aerofoil, pl)
-            @test translated_aerofoil[1][1] == leading_edge(ξ, pl) == 0.875
-            @test translated_aerofoil[end][1] == trailing_edge(ξ, pl) == 1.375
+    @testset "interface" verbose = true begin
+        for af in [
+            NACA4(0.1, 0.2, 0.3),
+            NACA00(1),
+            RectangularAerofoil(0.1),
+            seagull.aerofoil,
+        ]
+            @test length(aerofoil_height(0.0, 0.0, af; upper=true)) == 1
+            @test length(aerofoil(0.0, af)[1]) == 2
+            @test length(aerofoil(0.0, af; n=24)) == 48
         end
 
+        for pl in [
+            TrapezoidalPlanform(0.5, 0.4, 0.3, 0.5),
+            EllipticalPlanform(0.3, 0.5),
+            RectangularPlanform(0.6),
+            TriangularPlanform(0.5, 0.4),
+            seagull.planform
+        ]
+            @test length(chord(rand(), pl)) == 1
+            @test length(quarter_chord(rand(), pl)) == 1
+            @test length(leading_edge(rand(), pl)) == 1
+            @test length(trailing_edge(rand(), pl)) == 1
+            @test length(planform(pl)[1]) == 2
+            @test length(planform(pl; n=47)) == 94
+
+        end
+    end
+
+    @testset "wing transformation" verbose = true begin
+        af = RectangularAerofoil(0.2)
+        pl = RectangularPlanform(0.5)
+
+        y = rand()
+        af_pts = aerofoil(y, af; n=49)
+        af_pts_sc = WingModels.scale_aerofoil(y, af_pts, pl)
+        @test af_pts_sc[1][1] == 0.0 # wing leading edge has x = 0
+        @test af_pts_sc[49][1] == 0.5 # wing trailing edge has 1 * chord length
+        @test af_pts_sc[10][2] == af_pts[10][2] * 0.5
+        @test af_pts_sc[70][2] == af_pts[70][2] * 0.5
+
+        af_pts_tr = WingModels.translate_aerofoil(y, af_pts_sc, pl)
+        @test af_pts_tr[1][1] == -0.125 # leading edge at -0.25c
+        @test af_pts_tr[13][1] == 0.0 # quarter chord at x = 0
+        @test af_pts_tr[49][1] == 0.375 # trailing edge at 0.75d
+        @test af_pts_tr[10][2] == y
+        @test af_pts_tr[15][3] == af_pts_sc[15][2] # translation shouldnt change height
 
     end
+
 
     @testset "wing properties" verbose = true begin
         # area of rectangular wing with = c₀
@@ -49,41 +71,40 @@ using WingModels
         @test mean_chord(pl) ≈ 0.5
         @test mean_aerodynamic_chord(pl) ≈ 2 / 3
         @test second_moment_of_area(pl) ≈ 1 / 12
-
     end
 
 
     @testset "Liu" verbose = true begin
         # generic planform
         generic_planform = LiuPlanform(0.5, 0.0, (0.0, 0.0, 0.0, 0.0, 0.0), 1.0)
-        foreach(0:0.1:0.5) do ξ # 0.5x1 rectangle in this region
-            @test chord(ξ, generic_planform) == 1.0
-            @test quarter_chord(ξ, generic_planform) == 0.0
-            @test leading_edge(ξ, generic_planform) == -0.25
-            @test trailing_edge(ξ, generic_planform) == 0.75
+        foreach(0:0.1:0.5) do y # 0.5x1 rectangle in this region
+            @test chord(y, generic_planform) == 1.0
+            @test quarter_chord(y, generic_planform) == 0.0
+            @test leading_edge(y, generic_planform) == -0.25
+            @test trailing_edge(y, generic_planform) == 0.75
         end
-        foreach(0.5:0.1:1.0) do ξ # bounded by 4x(1-x) parabola in this region
-            @test chord(ξ, generic_planform) ≈ 4ξ * (1 - ξ)
-            @test quarter_chord(ξ, generic_planform) ≈ 0.0
-            @test leading_edge(ξ, generic_planform) ≈ -ξ * (1 - ξ)
-            @test trailing_edge(ξ, generic_planform) ≈ 3ξ * (1 - ξ)
+        foreach(0.5:0.1:1.0) do y # bounded by 4x(1-x) parabola in this region
+            @test chord(y, generic_planform) ≈ 4y * (1 - y)
+            @test quarter_chord(y, generic_planform) ≈ 0.0
+            @test leading_edge(y, generic_planform) ≈ -y * (1 - y)
+            @test trailing_edge(y, generic_planform) ≈ 3y * (1 - y)
         end
 
         # generic aerofoil: camber line is parabola from 0 to 1 with max camber of 0.25 at 0.5, constant along span
         generic_aerofoil = LiuAerofoil((1.0, 0.0, 0.0), (-1.0, 0.0, 0.0, 0.0), (1.0, 0.0), (1.0, 0.0))
-        foreach(0:0.1:1) do ξ
-            @test WingModels.LiuWings.max_camber(ξ, generic_aerofoil.zcmax) == 1.0
-            @test WingModels.LiuWings.max_thickness(ξ, generic_aerofoil.ztmax) == 1.0
-            @test WingModels.LiuWings.camber(0.0, generic_aerofoil.S, WingModels.LiuWings.max_camber(ξ, generic_aerofoil.zcmax)) == 0.0
-            @test WingModels.LiuWings.camber(0.5, generic_aerofoil.S, WingModels.LiuWings.max_camber(ξ, generic_aerofoil.zcmax)) == 0.25
-            @test WingModels.LiuWings.camber(1.0, generic_aerofoil.S, WingModels.LiuWings.max_camber(ξ, generic_aerofoil.zcmax)) == 0.0
-            @test WingModels.LiuWings.thickness(0.0, generic_aerofoil.A, WingModels.LiuWings.max_thickness(ξ, generic_aerofoil.ztmax)) == 0.001
-            @test WingModels.LiuWings.thickness(0.5, generic_aerofoil.A, WingModels.LiuWings.max_thickness(ξ, generic_aerofoil.ztmax)) == -(0.5^2 - sqrt(0.5))
-            @test WingModels.LiuWings.thickness(1.0, generic_aerofoil.A, WingModels.LiuWings.max_thickness(ξ, generic_aerofoil.ztmax)) == 0.001
-            @test aerofoil_pt(0.0, ξ, generic_aerofoil; upper=false) == [0.0, ξ, -0.001]
-            @test aerofoil_pt(0.5, ξ, generic_aerofoil; upper=false) == [0.5, ξ, 0.25 - -(0.5^2 - sqrt(0.5))]
-            @test aerofoil_pt(0.5, ξ, generic_aerofoil; upper=true) == [0.5, ξ, 0.25 + -(0.5^2 - sqrt(0.5))]
-            @test aerofoil_pt(1.0, ξ, generic_aerofoil; upper=false) == [1.0, ξ, -0.001]
+        foreach(0:0.1:1) do y
+            @test WingModels.LiuWings.max_camber(y, generic_aerofoil.zcmax) == 1.0
+            @test WingModels.LiuWings.max_thickness(y, generic_aerofoil.ztmax) == 1.0
+            @test WingModels.LiuWings.camber(0.0, generic_aerofoil.S, WingModels.LiuWings.max_camber(y, generic_aerofoil.zcmax)) == 0.0
+            @test WingModels.LiuWings.camber(0.5, generic_aerofoil.S, WingModels.LiuWings.max_camber(y, generic_aerofoil.zcmax)) == 0.25
+            @test WingModels.LiuWings.camber(1.0, generic_aerofoil.S, WingModels.LiuWings.max_camber(y, generic_aerofoil.zcmax)) == 0.0
+            @test WingModels.LiuWings.thickness(0.0, generic_aerofoil.A, WingModels.LiuWings.max_thickness(y, generic_aerofoil.ztmax)) == 0.001
+            @test WingModels.LiuWings.thickness(0.5, generic_aerofoil.A, WingModels.LiuWings.max_thickness(y, generic_aerofoil.ztmax)) == -(0.5^2 - sqrt(0.5))
+            @test WingModels.LiuWings.thickness(1.0, generic_aerofoil.A, WingModels.LiuWings.max_thickness(y, generic_aerofoil.ztmax)) == 0.001
+            @test aerofoil_height(0.0, y, generic_aerofoil; upper=false) == -0.001
+            @test aerofoil_height(0.5, y, generic_aerofoil; upper=false) == 0.25 - -(0.5^2 - sqrt(0.5))
+            @test aerofoil_height(0.5, y, generic_aerofoil; upper=true) == 0.25 + -(0.5^2 - sqrt(0.5))
+            @test aerofoil_height(1.0, y, generic_aerofoil; upper=false) == -0.001
         end
     end
 
@@ -97,24 +118,16 @@ using WingModels
         @test WingModels.naca4_aerofoil_camber_gradient_front(af.p / 100, af.m / 100, af.p / 100) == 0.0
         @test WingModels.naca4_aerofoil_camber_gradient_back(af.p / 100, af.m / 100, af.p / 100) == 0.0
 
-        # test values taken from airfoiltools.com
-        n = 100
-        pts = range(1, 0, step=-1 / (n ÷ 2))
-        idxs = range(8, 50, step=13)
-        ηs = pts[idxs]
-        @test aerofoil_pt(0.0, 0.0, af; upper=false) == [0.0, 0.0]
-        @test aerofoil_pt(ηs[1], 0.0, af; upper=true) ≈ [0.860952, 0.026875] atol = 1e-6
-        @test aerofoil_pt(ηs[2], 0.0, af; upper=true) ≈ [0.601010, 0.063237] atol = 1e-6
-        @test aerofoil_pt(ηs[3], 0.0, af; upper=true) ≈ [0.339105, 0.079199] atol = 1e-6
-        @test aerofoil_pt(ηs[4], 0.0, af; upper=true) ≈ [0.076565, 0.050135] atol = 1e-6
-        pts = range(0, 1, step=1 / (n ÷ 2))
-        idxs = range(8, 50, step=13)
-        ηs = pts[idxs]
-        @test aerofoil_pt(ηs[1], 0.0, af; upper=false) ≈ [0.143397, -0.040719] atol = 1e-6
-        @test aerofoil_pt(ηs[2], 0.0, af; upper=false) ≈ [0.400000, -0.037998] atol = 1e-6
-        @test aerofoil_pt(ηs[3], 0.0, af; upper=false) ≈ [0.658840, -0.023917] atol = 1e-6
-        @test aerofoil_pt(ηs[4], 0.0, af; upper=false) ≈ [0.919362, -0.006059] atol = 1e-6
-
+        # test values taken from airfoiltools.com: NACA2412, n points 20, cosine spacing
+        pts = aerofoil(0.0, af; n=11)
+        @test pts[1] == [0.0, 0.0]
+        @test pts[2] ≈ [0.022051, 0.028152] atol = 1e-6
+        @test pts[5] ≈ [0.344680, 0.079180] atol = 1e-6
+        @test pts[8] ≈ [0.795047, 0.037760] atol = 1e-6
+        @test pts[11] ≈ [1.0, 0.0] atol = 1e-6
+        @test pts[15] ≈ [0.792738, -0.014999] atol = 1e-6
+        @test pts[18] ≈ [0.346303, -0.039923] atol = 1e-6
+        @test pts[21] ≈ [0.026892, -0.023408] atol = 1e-6
     end
 
     @testset "geometric wings" verbose = true begin
@@ -161,12 +174,12 @@ using WingModels
         @test quarter_chord(1.0, pl) ≈ -0.75
 
         af = RectangularAerofoil(0.1) # rectangular aerofoil
-        @test aerofoil_pt(0.0, rand(), af; upper=true) == 0.1
-        @test aerofoil_pt(0.0, rand(), af; upper=false) == -0.1
-        @test aerofoil_pt(1.0, rand(), af; upper=true) == 0.1
-        @test aerofoil_pt(1.0, rand(), af; upper=false) == -0.1
-        @test aerofoil_pt(0.5, rand(), af; upper=true) == 0.1
-        @test aerofoil_pt(0.5, rand(), af; upper=false) == -0.1
+        @test aerofoil_height(0.0, rand(), af; upper=true) == 0.1
+        @test aerofoil_height(0.0, rand(), af; upper=false) == -0.1
+        @test aerofoil_height(1.0, rand(), af; upper=true) == 0.1
+        @test aerofoil_height(1.0, rand(), af; upper=false) == -0.1
+        @test aerofoil_height(0.5, rand(), af; upper=true) == 0.1
+        @test aerofoil_height(0.5, rand(), af; upper=false) == -0.1
     end
 
     @testset "export" verbose = true begin
