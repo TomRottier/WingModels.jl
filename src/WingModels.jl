@@ -117,7 +117,7 @@ planform(w::Wing; n=50) = planform(w.planform; n)
 
 Generates a wing from a given planform and aerofoil distribution.
 
-Returns a `Vector` of 3D [x,y,z] points describing the surface of the wing. The ordering of the points goes from the wing root leading edge to the wing root trailing edge along the upper surface, then from the wing root trailing edge to the wing root leading edge along the lower surface. From here it moves outwards along the spanwise axis to the wing tip following the same ordering pattern. The keyword arguments `nchord` and `nspan` specify the number of points per aerofoil surface and per planform edge, respectively (i.e. there are `2nchord` points per aerofoil and `2nspan` aerofoils along the span giving a total to `4 * nchord * nspan` points per wing).
+Returns a `Vector` of 3D [x,y,z] points describing the surface of the wing. The ordering of the points goes from the wing root leading edge to the wing root trailing edge along the upper surface, then from the wing root trailing edge to the wing root leading edge along the lower surface. From here it moves outwards along the spanwise axis to the wing tip following the same ordering pattern. The keyword arguments `nchord` and `nspan` specify the number of points per aerofoil surface and the number of aerofoils per span, respectively (i.e. there are `2nchord` points per aerofoil and `nspan` aerofoils along the span giving a total to `2 * nchord * nspan` points per wing).
 
 The other positional arguments `y₀ = 0.0` and `y₁ = 1.0` specify the starting and ending spanwise locations for the wing. This allows portions of the full wing to be easily created.
 
