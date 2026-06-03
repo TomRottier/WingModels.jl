@@ -1,7 +1,8 @@
 module WingModels
 
-using LinearAlgebra: normalize, ×
 using QuadGK: quadgk
+using DataInterpolations: BSplineApprox
+
 
 export AbstractPlanform, AbstractAerofoil, Wing
 export quarter_chord, chord, aerofoil_height

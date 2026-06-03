@@ -182,6 +182,40 @@ using WingModels
         @test aerofoil_height(0.5, rand(), af; upper=false) == -0.1
     end
 
+    @testset "empirical" verbose = true begin
+        # dummy aerofoil data
+        _af = NACA4(5, 2, 11)
+        xs = range(0, 1; step=0.1)
+        _af_pts = aerofoil(0.0, _af; n=length(xs))
+        _af_pts_upper = [aerofoil_height(x, 0.0, _af; upper=true) for x in xs]
+        _af_pts_lower = [aerofoil_height(x, 0.0, _af; upper=false) for x in xs]
+        data = hcat(xs, _af_pts_upper, _af_pts_lower)
+
+        data2 = data * 5rand()
+        data2[:, 1] .+ 2rand()
+        data2_sc = WingModels.scale_data(data2)
+        af = EmpiricalAerofoil(data2, 1.0) # no smoothing
+        @test WingModels.smoothing_number(1.0, data2, 3) == size(data2, 1)
+        @test WingModels.smoothing_number(0.0, data2, 3) == 4
+        @test data2_sc ≈ data
+
+        for x in xs
+            @test aerofoil_height(x, 0.0, af; upper=true) ≈ aerofoil_height(x, 0.0, _af; upper=true)
+            @test aerofoil_height(x, 0.0, af; upper=false) ≈ aerofoil_height(x, 0.0, _af; upper=false)
+        end
+
+        # dummy planform data
+        _pl = EllipticalPlanform(0.1, 0.3)
+        ys = range(0, 1; step=0.1)
+        pts = hcat(ys, [leading_edge(y, _pl) for y in ys], [trailing_edge(y, _pl) for y in ys]) # dummy data
+        pl = EmpiricalPlanform(pts, 1.0)
+        for f in (leading_edge, trailing_edge, chord, quarter_chord)
+            @test f(0.0, pl) ≈ f(0.0, _pl)
+            @test f(0.5, pl) ≈ f(0.5, _pl)
+            @test f(1.0, pl) ≈ f(1.0, _pl)
+        end
+    end
+
     @testset "export" verbose = true begin
         sg = WingModels.seagull
         sga = sg.aerofoil
