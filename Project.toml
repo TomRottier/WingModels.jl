@@ -1,6 +1,6 @@
 name = "WingModels"
 uuid = "3bc93d71-937d-427a-a787-bf59875babd2"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["tom <tom.rottier@manchester.ac.uk>"]
 
 [workspace]
