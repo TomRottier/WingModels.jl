@@ -18,7 +18,7 @@ binary stl specification:
 Write the vector of points contained in `wing` to an STL file. You must supply the `nchord` used to create `wing` so the facet connections can be determined correctly. Keyword argument `sf` is the scale factor and will scale each point in the output by the given amount.
 """
 function write_stl(filename, wing, nchord; sf=1.0)
-    file = filename[end-2:end] == ".stl" ? filename : filename * ".stl"
+    file = splitext(filename)[1] * ".stl"
 
     open(file, "w") do io
         # header
@@ -42,8 +42,11 @@ function write_stl(filename, wing, nchord; sf=1.0)
         # triangle data
         for i in 1:N
             # normal
-            v1, v2, v3 = wing[[connections[i]...]] .* sf # verticies of triangle
-            n = normalize((v2 - v1) × (v3 - v1)) # normal of triangle
+            v1, v2, v3 = wing[[connections[i]...]] .* sf # vertices of triangle
+            x1 = v2 - v1
+            x2 = v3 - v1
+            n = [x1[2] * x2[3] - x1[3] * x2[2], x1[3] * x2[1] - x1[1] * x2[3], x1[1] * x2[2] - x1[2] * x2[1]]
+            n ./= sqrt(sum(abs2, n))
 
             # write to file
             write(io, Float32.(n)...)
@@ -61,7 +64,7 @@ end
 
 function write_stl(filename, w::Wing; nchord, nspan, sf=1.0)
     wing_pts = wing(w, 0.0, 1.0; nchord, nspan)
-    return write_stl(filename, wing_pts, nchord; sf)
+    return write_stl(filename, wing_pts, 2nchord; sf)
 end
 
 # get indices of the points that make up a triangle
@@ -103,7 +106,7 @@ get_conns(nchord, nspan) = reduce(vcat, [vertex_conn(pt + ((i - 1) * nchord), nc
 Write each point in `wing` to a .txt file with delimiter `delim`.    
 """
 function write_pts(filename, wing; delim=" ")
-    file = filename[end-3:end] == ".txt" ? filename : filename * ".txt"
+    file = splitext(filename)[1] * ".txt"
 
     open(file, "w") do io
         for pt in wing
