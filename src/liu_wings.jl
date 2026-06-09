@@ -26,6 +26,7 @@ struct LiuPlanform <: AbstractPlanform
     E::NTuple{5,Float64}
     c₀::Float64
 end
+LiuPlanform(r, ϕ, E₁, E₂, E₃, E₄, E₅, c₀) = LiuPlanform(r, ϕ, (E₁, E₂, E₃, E₄, E₅), c₀)
 
 # aerofoils
 """
@@ -49,6 +50,9 @@ struct LiuAerofoil <: AbstractAerofoil
     zcmax::NTuple{2,Float64}
     ztmax::NTuple{2,Float64}
 end
+LiuAerofoil(S₁, S₂, S₃, A₁, A₂, A₃, A₄, B₁, B₂, C₁, C₂) =
+    LiuAerofoil((S₁, S₂, S₃), (A₁, A₂, A₃, A₄), (B₁, B₂), (C₁, C₂))
+
 
 # birnbaum-glauert mean camber line, normalised by chord
 camber(η, S, zcmax) = zcmax * η * (1 - η) * sum(n -> S[n] * (2η - 1)^(n - 1), 1:3)
