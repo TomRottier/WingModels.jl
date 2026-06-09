@@ -28,7 +28,6 @@ using WingModels
             @test length(trailing_edge(rand(), pl)) == 1
             @test length(planform(pl)[1]) == 2
             @test length(planform(pl; n=47)) == 94
-
         end
     end
 
@@ -221,13 +220,14 @@ using WingModels
         sga = sg.aerofoil
         sgp = sg.planform
         af = LiuAerofoil(sga.S, sga.A, sga.zcmax, sga.ztmax)
-        pf = LiuPlanform(0.5, 0.6, sgp.E, sgp.c₀)
+        pl = LiuPlanform(0.5, 0.6, sgp.E, sgp.c₀)
         nchord, nspan = 10, 5
-        w = wing(pf, af; nchord, nspan)
+        w = wing(af, pl; nchord, nspan)
         conns = WingModels.get_conns(nchord, nspan)
         @test conns[1] == (1, 11, 12)
         @test conns[2] == (12, 2, 1)
         @test conns[19] == (10, 20, 11)
         @test conns[20] == (11, 1, 10)
+        @test length(w) == 2 * nchord * nspan
     end
 end

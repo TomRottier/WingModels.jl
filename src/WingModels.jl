@@ -114,7 +114,7 @@ planform(w::Wing; n=50) = planform(w.planform; n)
 
 
 """
-    wing(pl::AbstractPlanform, af::AbstractAerofoil; nchord=100, nspan=50)
+    wing(af::AbstractAerofoil, pl::AbstractPlanform, y₀=0.0, y₁=1.0; nchord=100, nspan=50)
 
 Generates a wing from a given planform and aerofoil distribution.
 
@@ -122,9 +122,9 @@ Returns a `Vector` of 3D [x,y,z] points describing the surface of the wing. The 
 
 The other positional arguments `y₀ = 0.0` and `y₁ = 1.0` specify the starting and ending spanwise locations for the wing. This allows portions of the full wing to be easily created.
 
-See also: [`AbstractPlanform`](@ref), [`AbstractAerofoil`](@ref) 
+See also: [`AbstractAerofoil`](@ref), [`AbstractPlanform`](@ref)
 """
-function wing(pl::AbstractPlanform, af::AbstractAerofoil, y₀=0.0, y₁=1.0; nchord=100, nspan=50)
+function wing(af::AbstractAerofoil, pl::AbstractPlanform, y₀=0.0, y₁=1.0; nchord=100, nspan=50)
     # spanwise locations
     ys = range(y₀, y₁; length=nspan)
 
