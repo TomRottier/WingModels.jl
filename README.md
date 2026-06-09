@@ -25,10 +25,10 @@ First import the package:
 ```
 
 ### Create simple rectangular wing with NACA0012 aerofoil
-First, create the aerofoil distribution, for this example we are using the NACA0012 aerofoil which remains the same along the span. This is included with this package as the `NACA00XX` type: 
+First, create the aerofoil distribution, for this example we are using the NACA0012 aerofoil which remains the same along the span. This is included with this package as the `NACA00` type: 
 
 ```julia
-    af = NACA00XX(12) # a constant aerofoil distribution using a NACA0012 aerofoil
+    af = NACA00(12) # a constant aerofoil distribution using a NACA0012 aerofoil
 ```
 the points defining this aerofoil at a specific spanwise location can be returned with the following function:
 ```julia
@@ -60,13 +60,13 @@ which is of course the same anywhere along the span for a rectangular planform.
 
 The whole wing is can then be created:
 ```julia
-    w = Wing(pl, af)
+    w = Wing(af, pl)
 ```
 to generate a vector of points on the surface of this wing:
 ```julia
     wing_pts = wing(w, 0.0, 1.0; nchord=100, nspan=50) # create wing from root (0.0) to tip (1.0)
 ```
-the keyword arguments `nchord` and `nspan` specify the number of points per aerofoil and the number of aerofoils along the span, respectively. 
+the keyword arguments `nchord` and `nspan` specify the number of points per aerofoil surface and the number of aerofoils along the span, respectively. 
 
 The wing, aerofoil, and planform can be easily visualised. For example using the `Makie` plotting library:
 ```julia
@@ -133,7 +133,7 @@ The full wing can then be used just as before:
 ```julia
     af = YourAerofoil(aerofoil_data...)
     pl = YourPlanform(planform_data...)
-    w = Wing(pl, af)
+    w = Wing(af, pl)
 
     wing_pts = wing(w, 0.0, 1.0; nchord=100, nspan=50)
     write_stl("custom_wing.stl", w; nchord=50, nspan=20, sf=200)

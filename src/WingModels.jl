@@ -140,7 +140,7 @@ function wing(af::AbstractAerofoil, pl::AbstractPlanform, y₀=0.0, y₁=1.0; nc
     return wing
 end
 
-wing(w::Wing, y₀=0.0, y₁=1.0; nchord=100, nspan=50) = wing(w.planform, w.aerofoil, y₀, y₁; nchord=nchord, nspan=nspan)
+wing(w::Wing, y₀=0.0, y₁=1.0; nchord=100, nspan=50) = wing(w.aerofoil, w.planform, y₀, y₁; nchord=nchord, nspan=nspan)
 
 
 """
